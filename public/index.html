@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Performance Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        #login-screen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; z-index: 100; transition: opacity 0.5s ease; }
+        .login-card { animation: fadeIn 0.8s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .tab-btn { transition: all 0.3s ease; border-bottom: 3px solid transparent; padding-bottom: 8px; }
+        .tab-btn.active { border-bottom-color: #4f46e5; color: #4f46e5; font-weight: 600; }
+        
+        /* --- Theme Styles for Tabs --- */
+        .admin-tab.active { border-bottom-color: #1e3a8a; color: #1e3a8a; }
+        .analytics-tab.active { border-bottom-color: #1e3a8a; color: #1e3a8a; }
+
+        /* --- Theme Styles for Panes --- */
+        .admin-pane-section { background-color: #f9fafb; }
+        .analytics-pane-section { background-color: #f9fafb; }
+
+        .table-container { overflow-x: auto; border: 1px solid #e5e7eb; border-radius: 0.75rem; }
+        table { width: 100%; }
+        td, th { white-space: nowrap; padding: 12px 16px; }
+        .sticky-col { position: -webkit-sticky; position: sticky; left: 0; background-color: #ffffff; z-index: 10; }
+        thead .sticky-col, tfoot .sticky-col { background-color: #f9fafb; z-index: 20; }
+        tbody tr:hover .sticky-col { background-color: #f3f4f6; }
+        .data-input { width: 60px; padding: 6px 8px; border-radius: 6px; border: 1px solid #d1d5db; text-align: center; font-size: 14px; transition: all 0.2s ease; }
+        .data-input:focus { outline: 2px solid transparent; outline-offset: 2px; border-color: #4f46e5; box-shadow: 0 0 0 2px #c7d2fe; }
+        .data-input::-webkit-outer-spin-button, .data-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .data-input[type=number] { -moz-appearance: textfield; }
+        .summary-section { margin-top: 3rem; background-color: #ffffff; padding: 1.5rem; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); }
+        .summary-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+        tbody tr:hover { background-color: #f3f4f6; }
+        #auth-status { background-color: #ffffff; padding: 0.5rem 1rem; border-radius: 9999px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); display: flex; align-items: center; gap: 0.75rem; }
+        #loading-spinner { transition: opacity 0.3s ease; }
+        .chart-container { position: relative; height: 300px; margin-top: 1.5rem; }
+        .btn { background-color: #4f46e5; color: white; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; transition: background-color 0.2s ease; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+        .btn:hover { background-color: #4338ca; }
+        .btn-secondary { background-color: #6b7280; }
+        .btn-secondary:hover { background-color: #4b5563; }
+        .btn-danger { background-color: #dc2626; }
+        .btn-danger:hover { background-color: #b91c1c; }
+        .nav-btn { background-color: #eef2ff; color: #4338ca; padding: 8px 12px; border: 1px solid #e0e7ff; }
+        .nav-btn:hover { background-color: #e0e7ff; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); }
+        .highlight-today { background-color: #e0e7ff; }
+        .highlight-max-files { background-color: #dcfce7; }
+        .highlight-max-errors { background-color: #fee2e2; }
+        tfoot tr { background-color: #f1f5f9; font-weight: 600; }
+        .progress-bar-container { width: 100%; background-color: #e5e7eb; border-radius: 9999px; overflow: hidden; height: 8px; margin-top: 4px; }
+        .progress-bar { height: 100%; background-color: #4f46e5; transition: width 0.5s ease-in-out; }
+        .input-group { position: relative; display: flex; flex-direction: row; gap: 4px; align-items: center; justify-content: center; }
+        .saving-indicator { position: absolute; top: 50%; right: -20px; transform: translateY(-50%); width: 16px; height: 16px; opacity: 0; transition: opacity 0.3s ease; }
+        .saving-indicator.saving { opacity: 1; }
+        #back-to-top { position: fixed; bottom: 20px; right: 20px; display: none; transition: opacity 0.3s, visibility 0.3s; opacity: 0; visibility: hidden; }
+        #back-to-top.show { opacity: 1; visibility: visible; }
+        
+        /* --- Modal Styles --- */
+        .modal-overlay { position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+        .modal-overlay.show { opacity: 1; pointer-events: auto; }
+        .modal-content { background-color: white; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); width: 90%; max-width: 600px; transform: scale(0.95); transition: transform 0.3s ease; max-height: 90vh; display: flex; flex-direction: column; }
+        .modal-overlay.show .modal-content { transform: scale(1); }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; }
+        .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; background-color: #f9fafb; }
+
+        /* --- Notification/Toast Styles --- */
+        .toast { display: flex; align-items: center; padding: 1rem 1.5rem; border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); transform: translateX(120%); transition: all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55); opacity: 0; }
+        .toast.show { transform: translateX(0); opacity: 1; }
+        .toast.success { background-color: #dcfce7; color: #166534; }
+        .toast.error { background-color: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+
+<body class="p-2 md:p-8">
+
+    <div id="notification-container" class="fixed top-5 right-5 z-[200] space-y-3"></div>
+
+    <div id="loading-spinner" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+        <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+    
+    <div id="login-screen">
+        <div class="login-card text-center bg-white p-8 md:p-12 rounded-xl shadow-lg max-w-md w-full mx-4">
+             <div class="mb-8">
+                 <span class="text-3xl font-bold text-blue-600">one</span><span class="text-3xl font-bold text-gray-800">origin</span>
+             </div>
+            <h1 id="login-title" class="text-2xl md:text-3xl font-bold text-gray-800">Welcome to the Dashboard</h1>
+            <p id="login-message" class="mt-2 text-gray-600 mb-8">Please sign in to continue.</p>
+            <button id="login-btn" class="btn mx-auto justify-center w-full">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.088,5.574l6.19,5.238C39.902,35.688,44,30.488,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+                <span>Sign in with Google</span>
+            </button>
+            <button id="go-back-btn" class="btn mx-auto mt-4 hidden bg-gray-500 hover:bg-gray-600 justify-center w-full">
+                <span>Go Back</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="main-content" class="max-w-7xl mx-auto hidden">
+        <div class="flex flex-col md:flex-row justify-between items-start mb-8 gap-4">
+            <div class="flex items-center gap-4">
+                <img src="https://i.postimg.cc/yxbKRQHZ/oneorigin-logo.jpg" alt="Company Logo" class="h-12 w-12 rounded-full">
+                <div>
+                    <h1 class="text-2xl md:text-4xl font-bold text-gray-800">Team Performance Dashboard</h1>
+                    <p class="mt-1 md:mt-2 text-base md:text-lg text-gray-600">Track daily, weekly, and monthly file processing and error rates.</p>
+                </div>
+            </div>
+            <div id="auth-status" class="self-start md:self-center">
+                <img id="user-photo" class="h-8 w-8 rounded-full" src="" alt="User photo">
+                <span id="user-name" class="text-sm text-gray-700 font-semibold"></span>
+            </div>
+        </div>
+
+        <div class="border-b border-gray-200 mb-6">
+            <nav id="tabs" class="flex space-x-6 -mb-px overflow-x-auto"></nav>
+        </div>
+
+        <div id="tab-content">
+            <div id="Summary" class="tab-pane">
+                 <div class="summary-section">
+                      <div class="summary-header">
+                          <div class="flex items-center gap-4">
+                              <h3 class="text-xl font-semibold text-gray-800">Daily Summary</h3>
+                              <input type="date" id="date-search" class="border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2">
+                          </div>
+                          <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-sm font-medium text-gray-500">Total Time Spent</p>
+                                <p id="daily-total-time" class="text-lg font-bold text-gray-800">0h 0m</p>
+                            </div>
+                            <button id="export-daily" class="btn export-btn">Export to CSV</button>
+                          </div>
+                      </div>
+                      <div class="table-container"><table id="daily-summary-table" class="min-w-full divide-y divide-gray-200"></table></div>
+                      <div class="chart-container"><canvas id="daily-chart"></canvas></div>
+                 </div>
+                 <div class="summary-section">
+                      <div class="summary-header">
+                          <div class="flex items-center gap-4">
+                              <h3 class="text-xl font-semibold text-gray-800">Weekly Summary</h3>
+                              <input type="week" id="week-search" class="border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2">
+                          </div>
+                           <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-sm font-medium text-gray-500">Total Time Spent</p>
+                                <p id="weekly-total-time" class="text-lg font-bold text-gray-800">0h 0m</p>
+                            </div>
+                            <button id="export-weekly" class="btn export-btn">Export to CSV</button>
+                          </div>
+                      </div>
+                      <div class="table-container"><table id="weekly-summary-table" class="min-w-full divide-y divide-gray-200"></table></div>
+                      <div class="chart-container"><canvas id="weekly-chart"></canvas></div>
+                 </div>
+                 <div class="summary-section">
+                      <div class="summary-header">
+                          <div class="flex items-center gap-4">
+                              <h3 class="text-xl font-semibold text-gray-800">Monthly Summary</h3>
+                              <input type="month" id="month-search" class="border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2">
+                          </div>
+                           <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <p class="text-sm font-medium text-gray-500">Total Time Spent</p>
+                                <p id="monthly-total-time" class="text-lg font-bold text-gray-800">0h 0m</p>
+                            </div>
+                            <button id="export-monthly" class="btn export-btn">Export to CSV</button>
+                          </div>
+                      </div>
+                      <div class="table-container"><table id="monthly-summary-table" class="min-w-full divide-y divide-gray-200"></table></div>
+                      <div class="chart-container"><canvas id="monthly-chart"></canvas></div>
+                 </div>
+            </div>
+            <div id="Analytics" class="tab-pane hidden">
+                <!-- Analytics content will go here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Entry Modal -->
+    <div id="quick-entry-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">Quick Data Entry</h2>
+                    <p id="modal-subtitle" class="text-sm text-gray-500">Enter numbers for a specific day.</p>
+                </div>
+                <input type="date" id="modal-date-picker" class="border border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2">
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <input type="text" id="client-search-input" placeholder="🔍 Search for a client..." class="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                <div class="grid grid-cols-3 gap-4 items-center mb-2 px-2">
+                    <span class="text-xs font-bold text-gray-500 uppercase">Client</span>
+                    <span class="text-xs font-bold text-gray-500 uppercase">Files</span>
+                    <span class="text-xs font-bold text-gray-500 uppercase">Errors</span>
+                </div>
+                <div id="quick-entry-form-container" class="space-y-4">
+                    <!-- Client rows will be dynamically inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer flex justify-end gap-3">
+                <button id="close-modal-btn" class="btn btn-secondary">Cancel</button>
+                <button id="save-all-modal-btn" class="btn">Save All & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="modal-overlay">
+        <div class="modal-content !max-w-md">
+            <div class="modal-header">
+                <h2 id="confirmation-title" class="text-xl font-bold text-gray-800">Confirm Action</h2>
+            </div>
+            <div class="modal-body">
+                <p id="confirmation-message">Are you sure you want to proceed? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer flex justify-end gap-3">
+                <button id="cancel-confirmation-btn" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-action-btn" class="btn btn-danger">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+
+    <button id="back-to-top" class="btn rounded-full p-3 !fixed">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+        </svg>
+    </button>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, addDoc, serverTimestamp, limit, orderBy, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- App State ---
+            let userNames = [];
+            let clients = [];
+            let adminUsers = [];
+            let masterData = {};
+            let timeConfig = { average: 2, clients: {} };
+            let debounceTimers = {};
+            let charts = { daily: null, weekly: null, monthly: null, analyticsPie: null, analyticsLine: null };
+            let currentDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+            let currentUser = null;
+            let monthlyGoal = 1000;
+            let weeklyGoal = 250;
+
+            // --- Firebase Config ---
+            let firebaseConfig;
+            const originalConfig = {
+                apiKey: "AIzaSyAd_PgTFVSNMPyQ1pQuyhf8aI5cxnmbhNM",
+                authDomain: "team-nethra.firebaseapp.com",
+                projectId: "team-nethra",
+                storageBucket: "team-nethra.firebasestorage.app",
+                messagingSenderId: "78934450007",
+                appId: "1:78934450007:web:20ed2e580d6d8873106812",
+                measurementId: "G-CR14GVCBMD"
+            };
+
+            try {
+                const envConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+                const envConfig = JSON.parse(envConfigStr);
+                firebaseConfig = envConfig.apiKey ? envConfig : originalConfig;
+            } catch (e) {
+                firebaseConfig = originalConfig;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
+
+            // --- UI Elements ---
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const loginScreen = document.getElementById('login-screen');
+            const loginBtn = document.getElementById('login-btn');
+            const goBackBtn = document.getElementById('go-back-btn');
+            const mainContent = document.getElementById('main-content');
+            const loginTitle = document.getElementById('login-title');
+            const loginMessage = document.getElementById('login-message');
+            const quickEntryModal = document.getElementById('quick-entry-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+            const saveAllModalBtn = document.getElementById('save-all-modal-btn');
+            const clientSearchInput = document.getElementById('client-search-input');
+            const modalDatePicker = document.getElementById('modal-date-picker');
+            const confirmationModal = document.getElementById('confirmation-modal');
+            
+            // --- Helper Functions ---
+            const createIdFromName = (name) => name ? name.replace(/[^a-zA-Z0-9]/g, '-') : '';
+            const isUserAdmin = () => currentUser && adminUsers.includes(currentUser.displayName);
+
+            function getTodayIST() {
+                const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                return now.toISOString().split('T')[0];
+            }
+
+            function getDatesForMonth(date) {
+                const year = date.getFullYear();
+                const month = date.getMonth();
+                const numDays = new Date(year, month + 1, 0).getDate();
+                return Array.from({ length: numDays }, (_, i) => `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`);
+            }
+
+            // --- Notification/Toast Function ---
+            function showNotification(message, type = 'success') {
+                const container = document.getElementById('notification-container');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                
+                const icon = type === 'success' 
+                    ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+                    : `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+                    
+                toast.innerHTML = `${icon}<span>${message}</span>`;
+                container.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.classList.add('show');
+                }, 100);
+
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                    toast.addEventListener('transitionend', () => {
+                        if (toast.parentElement) {
+                            toast.remove();
+                        }
+                    });
+                }, 4000);
+            }
+
+            // --- Authentication Logic ---
+            onAuthStateChanged(auth, async (user) => {
+                loadingSpinner.style.display = 'none';
+                if (user) {
+                    const usersDocRef = doc(db, "config", "users");
+                    const usersDocSnap = await getDoc(usersDocRef);
+                    const authorizedUsers = usersDocSnap.exists() ? usersDocSnap.data().names : ["Priyanshu Pathak", "Nethra V Prameya"];
+
+                    if (authorizedUsers.includes(user.displayName)) {
+                        currentUser = user;
+                        await loadConfig(); 
+                        document.getElementById('user-name').textContent = user.displayName || 'User';
+                        document.getElementById('user-photo').src = user.photoURL || '';
+                        loginTitle.textContent = 'Success!';
+                        loginTitle.classList.add('text-green-600');
+                        loginMessage.textContent = `Welcome, ${user.displayName}. Loading dashboard...`;
+                        loginBtn.style.display = 'none';
+
+                        setTimeout(() => {
+                            loginScreen.style.opacity = '0';
+                            setTimeout(() => {
+                                loginScreen.style.display = 'none';
+                                mainContent.classList.remove('hidden');
+                                loadInitialData();
+                            }, 500);
+                        }, 1500);
+
+                    } else {
+                        loginTitle.textContent = 'Access Denied';
+                        loginTitle.classList.add('text-red-600');
+                        loginMessage.textContent = `Your account (${user.email}) is not authorized.`;
+                        loginBtn.style.display = 'none';
+                        goBackBtn.style.display = 'flex';
+                    }
+                } else {
+                    resetUIForLogout();
+                }
+            });
+
+            loginBtn.addEventListener('click', () => {
+                const provider = new GoogleAuthProvider();
+                signInWithPopup(auth, provider).catch(error => console.error("Login failed:", error));
+            });
+
+            goBackBtn.addEventListener('click', () => signOut(auth));
+
+            function resetUIForLogout() {
+                currentUser = null;
+                loginTitle.textContent = 'Welcome to the Dashboard';
+                loginTitle.classList.remove('text-red-600', 'text-green-600');
+                loginMessage.textContent = 'Please sign in to continue.';
+                loginBtn.style.display = 'flex';
+                goBackBtn.style.display = 'none';
+                loginScreen.style.display = 'flex';
+                loginScreen.style.opacity = '1';
+                mainContent.classList.add('hidden');
+            }
+
+            // --- Configuration Management ---
+            async function loadConfig() {
+                const usersDoc = await getDoc(doc(db, "config", "users"));
+                userNames = usersDoc.exists() ? usersDoc.data().names : ["Priyanshu Pathak", "Nethra V Prameya"];
+
+                const clientsDoc = await getDoc(doc(db, "config", "clients"));
+                clients = clientsDoc.exists() ? clientsDoc.data().names : ["Bridge Port", "CONCORDIA HS & CLG", "NOVA CLG & HS"];
+
+                const adminsDoc = await getDoc(doc(db, "config", "admins"));
+                adminUsers = adminsDoc.exists() ? adminsDoc.data().names : ["Priyanshu Pathak"];
+
+                const timeDoc = await getDoc(doc(db, "config", "time"));
+                if (timeDoc.exists()) {
+                    timeConfig = timeDoc.data();
+                }
+            }
+
+            async function updateConfigList(listName, newList, itemName = '', action = 'updated') {
+                try {
+                    await setDoc(doc(db, "config", listName), { names: newList });
+                    
+                    let successMessage = '';
+                    const listTitle = listName.charAt(0).toUpperCase() + listName.slice(1, -1);
+                    if (action === 'added') {
+                        successMessage = `${listTitle} '${itemName}' added successfully.`;
+                    } else if (action === 'removed') {
+                        successMessage = `${listTitle} '${itemName}' removed successfully.`;
+                    } else {
+                        successMessage = `${listTitle} list updated successfully.`;
+                    }
+                    showNotification(successMessage, 'success');
+
+                    await loadConfig(); 
+                    generateUserTabsAndPanes(); 
+                    createUserDataTables();
+                } catch (error) {
+                    console.error(`Error updating ${listName} list:`, error);
+                    showNotification(`Permission Denied: Could not modify ${listName} list.`, 'error');
+                }
+            }
+            
+            // --- Initial Data Loading ---
+            async function loadInitialData() {
+                generateUserTabsAndPanes();
+                initializePickers();
+                await fetchAndRenderMonthData();
+                await loadGoal("monthly");
+                await loadGoal("weekly");
+                setupAuditLogListener();
+            }
+            
+            async function fetchAndRenderMonthData() {
+                const monthId = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+                masterData = {}; 
+                const q = query(collection(db, "monthlyReports"), where("month", "==", monthId));
+
+                onSnapshot(q, (snapshot) => {
+                    if (snapshot.metadata.hasPendingWrites) {
+                        return;
+                    }
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === "added" || change.type === "modified") {
+                            const docData = change.doc.data();
+                            masterData[docData.userId] = docData.data;
+                        }
+                    });
+                    createUserDataTables();
+                    updateAllSummaries();
+                    updateAnalyticsView(); // Update analytics when data changes
+                });
+
+                const querySnapshot = await getDocs(q);
+                if (querySnapshot.empty) {
+                     userNames.forEach(userName => {
+                         const userId = createIdFromName(userName);
+                         if (!masterData[userId]) masterData[userId] = {};
+                     });
+                     createUserDataTables();
+                     updateAllSummaries();
+                     updateAnalyticsView();
+                }
+            }
+
+            async function updateFirestoreData(user, client, date, type, value, oldValue, inputElement) {
+                if (!currentUser) {
+                    console.error("Cannot update data, no user is logged in.");
+                    return; 
+                }
+                const userId = createIdFromName(user);
+                const monthId = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+                const docId = `${userId}-${monthId}`;
+                const docRef = doc(db, "monthlyReports", docId);
+                const author = currentUser.displayName;
+
+                try {
+                    await setDoc(docRef, {
+                        userId: userId, userName: user, month: monthId,
+                        data: { [createIdFromName(client)]: { [date]: { [type]: value } } }
+                    }, { merge: true });
+
+                    await addDoc(collection(db, "auditLog"), {
+                        user: author,
+                        action: `Updated ${type} for ${client} on ${date} from ${oldValue} to ${value}.`,
+                        timestamp: serverTimestamp()
+                    });
+                    
+                    if (inputElement) {
+                        const indicator = inputElement.parentElement.querySelector('.saving-indicator');
+                        indicator.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                        setTimeout(() => {
+                            indicator.innerHTML = `<svg class="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                            indicator.classList.remove('saving');
+                        }, 1500);
+                    }
+
+
+                } catch(e) {
+                    console.error("Error saving data:", e);
+                }
+            }
+            
+            async function loadGoal(type) {
+                const goalRef = doc(db, "goals", type);
+                const goalSnap = await getDoc(goalRef);
+                if (goalSnap.exists()) {
+                    const target = goalSnap.data().fileTarget;
+                    if (type === 'monthly') {
+                        monthlyGoal = target || 1000;
+                        if (document.getElementById('goal-input')) document.getElementById('goal-input').value = monthlyGoal;
+                    } else if (type === 'weekly') {
+                        weeklyGoal = target || 250;
+                        if (document.getElementById('weekly-goal-input')) document.getElementById('weekly-goal-input').value = weeklyGoal;
+                    }
+                }
+            }
+            
+            async function saveGoal(newGoal, type) {
+                const goalRef = doc(db, "goals", type);
+                await setDoc(goalRef, { fileTarget: newGoal });
+                if (type === 'monthly') monthlyGoal = newGoal;
+                if (type === 'weekly') weeklyGoal = newGoal;
+                showNotification(`${type.charAt(0).toUpperCase() + type.slice(1)} goal updated to ${newGoal}.`, 'success');
+                updateAllSummaries();
+            }
+            
+            function setupAuditLogListener() {
+                const q = query(collection(db, "auditLog"), orderBy("timestamp", "desc"), limit(10));
+                onSnapshot(q, (querySnapshot) => {
+                    const logContainer = document.getElementById('audit-log');
+                    if (!logContainer) return;
+                    logContainer.innerHTML = '';
+                    let logs = [];
+                    querySnapshot.forEach(doc => logs.push(doc.data()));
+                    logs.forEach(log => {
+                        const li = document.createElement('li');
+                        const timeString = log.timestamp ? log.timestamp.toDate().toLocaleTimeString() : 'pending...';
+                        li.textContent = `[${timeString}] ${log.user} ${log.action}`;
+                        logContainer.appendChild(li);
+                    });
+                });
+            }
+
+            function generateUserTabsAndPanes() {
+                const tabsContainer = document.getElementById('tabs');
+                const tabContentContainer = document.getElementById('tab-content');
+                
+                tabsContainer.innerHTML = '<button data-target="Summary" class="tab-btn py-3 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 active">Summary</button>';
+
+                const analyticsButton = document.createElement('button');
+                analyticsButton.dataset.target = 'Analytics';
+                analyticsButton.className = 'tab-btn analytics-tab py-3 px-1 text-sm font-medium text-gray-500 hover:text-gray-700';
+                analyticsButton.textContent = 'Analytics';
+                tabsContainer.appendChild(analyticsButton);
+
+                const usersToShow = isUserAdmin() ? userNames : [currentUser.displayName];
+
+                usersToShow.forEach(userName => {
+                    if (!userNames.includes(userName)) return;
+                    const userId = createIdFromName(userName);
+                    const button = document.createElement('button');
+                    button.className = 'tab-btn py-3 px-1 text-sm font-medium text-gray-500 hover:text-gray-700';
+                    button.dataset.target = userId;
+                    button.textContent = userName;
+                    tabsContainer.appendChild(button);
+
+                    if (!document.getElementById(userId)) {
+                        const pane = document.createElement('div');
+                        pane.id = userId;
+                        pane.className = 'tab-pane hidden';
+                        tabContentContainer.appendChild(pane);
+                    }
+                });
+                
+                if (isUserAdmin()) {
+                    const adminButton = document.createElement('button');
+                    adminButton.className = 'tab-btn admin-tab py-3 px-1 text-sm font-medium text-gray-500 hover:text-yellow-600';
+                    adminButton.dataset.target = 'Admin';
+                    adminButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 1 1 0 000-2z" clip-rule="evenodd" />
+                        </svg>
+                        Admin Panel
+                    `;
+                    tabsContainer.appendChild(adminButton);
+
+                    let adminPane = document.getElementById('Admin');
+                    if (!adminPane) {
+                        adminPane = document.createElement('div');
+                        adminPane.id = 'Admin';
+                        adminPane.className = 'tab-pane hidden';
+                        tabContentContainer.appendChild(adminPane);
+                    }
+                    adminPane.innerHTML = getAdminPanelHTML();
+                    attachAdminEventListeners();
+                }
+
+                document.getElementById('Analytics').innerHTML = getAnalyticsPaneHTML();
+                const analyticsUserSelect = document.getElementById('analytics-user-select');
+                if (analyticsUserSelect) analyticsUserSelect.addEventListener('change', updateAnalyticsView);
+                document.getElementById('analytics-period-select').addEventListener('change', updateAnalyticsView);
+                document.getElementById('export-analytics-csv').addEventListener('click', exportAnalyticsToCSV);
+                updateAnalyticsView();
+            }
+            
+            function getAdminPanelHTML() {
+                const userListHTML = userNames.map(name => `<li class="flex items-center justify-between bg-gray-100 p-2 rounded"><span>${name}</span><button data-name="${name}" class="remove-user-btn btn btn-danger text-xs p-1">Remove</button></li>`).join('');
+                const clientListHTML = clients.map(name => `<li class="flex items-center justify-between bg-gray-100 p-2 rounded"><span>${name}</span><button data-name="${name}" class="remove-client-btn btn btn-danger text-xs p-1">Remove</button></li>`).join('');
+                const adminListHTML = adminUsers.map(name => `<li class="flex items-center justify-between bg-gray-100 p-2 rounded"><span>${name}</span><button data-name="${name}" class="remove-admin-btn btn btn-danger text-xs p-1">Remove</button></li>`).join('');
+                const timeSettingsHTML = clients.map(client => `
+                    <div class="flex items-center gap-4">
+                        <label class="font-medium w-48 truncate" title="${client}">${client}:</label>
+                        <input type="number" data-client="${client}" class="data-input w-24 time-input" value="${timeConfig.clients[client] || ''}" placeholder="Avg">
+                    </div>
+                `).join('');
+
+
+                return `
+                    <div class="summary-section admin-pane-section !mt-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div class="flex flex-col gap-8">
+                                <div class="p-4 border rounded-lg bg-white">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Manage Users & Admins</h3>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <h4 class="font-semibold text-gray-600 mb-2">Users</h4>
+                                            <ul id="user-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto p-2 bg-gray-50 rounded">${userListHTML}</ul>
+                                            <div class="flex gap-2"><input type="text" id="new-user-input" placeholder="New user name" class="data-input flex-grow !w-auto"><button id="add-user-btn" class="btn">Add</button></div>
+                                        </div>
+                                        <div>
+                                            <h4 class="font-semibold text-gray-600 mb-2">Admins</h4>
+                                            <ul id="admin-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto p-2 bg-gray-50 rounded">${adminListHTML}</ul>
+                                            <div class="flex gap-2"><input type="text" id="new-admin-input" placeholder="New admin name" class="data-input flex-grow !w-auto"><button id="add-admin-btn" class="btn">Add</button></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Manage Clients</h3>
+                                    <ul id="client-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 bg-gray-50 rounded">${clientListHTML}</ul>
+                                    <div class="flex gap-2"><input type="text" id="new-client-input" placeholder="New client name" class="data-input flex-grow !w-auto"><button id="add-client-btn" class="btn">Add</button></div>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white border-red-200">
+                                    <h3 class="text-xl font-semibold text-red-800 mb-4">Danger Zone</h3>
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <p class="font-semibold">Delete Current Month's Data</p>
+                                            <p class="text-sm text-gray-600">This will permanently delete all file and error entries for the current month (${currentDate.toLocaleString('default', { month: 'long'})}). This action cannot be undone.</p>
+                                        </div>
+                                        <button id="delete-month-data-btn" class="btn btn-danger">Delete Data</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-8">
+                                 <div class="p-4 border rounded-lg bg-white">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Goal Setting</h3>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center gap-4"><label for="goal-input" class="font-medium w-32">Monthly Target:</label><input type="number" id="goal-input" class="data-input w-24" value="${monthlyGoal}"><button id="save-goal-btn" class="btn">Save</button></div>
+                                        <div class="flex items-center gap-4"><label for="weekly-goal-input" class="font-medium w-32">Weekly Target:</label><input type="number" id="weekly-goal-input" class="data-input w-24" value="${weeklyGoal}"><button id="save-weekly-goal-btn" class="btn">Save</button></div>
+                                    </div>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Time Settings (Minutes)</h3>
+                                    <div class="space-y-4">
+                                        <div class="flex items-center gap-4">
+                                            <label for="avg-time-input" class="font-medium w-48">Average Time Per File:</label>
+                                            <input type="number" id="avg-time-input" class="data-input w-24" value="${timeConfig.average}">
+                                        </div>
+                                        <hr/>
+                                        <h4 class="font-semibold text-gray-600">Client Specific Times:</h4>
+                                        <div class="space-y-3 max-h-48 overflow-y-auto">${timeSettingsHTML}</div>
+                                        <div class="flex justify-end">
+                                            <button id="save-time-settings-btn" class="btn">Save Time Settings</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-4 border rounded-lg bg-white">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-4">Recent Activity</h3>
+                                    <ul id="audit-log" class="space-y-3 text-sm text-gray-600 max-h-[28rem] overflow-y-auto p-2 bg-gray-50 rounded"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function attachAdminEventListeners() {
+                document.getElementById('save-goal-btn')?.addEventListener('click', () => saveGoal(parseInt(document.getElementById('goal-input').value, 10), 'monthly'));
+                document.getElementById('save-weekly-goal-btn')?.addEventListener('click', () => saveGoal(parseInt(document.getElementById('weekly-goal-input').value, 10), 'weekly'));
+
+                document.getElementById('add-user-btn')?.addEventListener('click', () => {
+                    const newName = document.getElementById('new-user-input').value.trim();
+                    if (newName && !userNames.includes(newName)) {
+                        updateConfigList('users', [...userNames, newName], newName, 'added');
+                    }
+                    document.getElementById('new-user-input').value = '';
+                });
+                document.getElementById('add-client-btn')?.addEventListener('click', () => {
+                    const newName = document.getElementById('new-client-input').value.trim();
+                    if (newName && !clients.includes(newName)) {
+                        updateConfigList('clients', [...clients, newName], newName, 'added');
+                    }
+                    document.getElementById('new-client-input').value = '';
+                });
+                document.getElementById('add-admin-btn')?.addEventListener('click', () => {
+                    const newName = document.getElementById('new-admin-input').value.trim();
+                    if (newName && !adminUsers.includes(newName)) {
+                        updateConfigList('admins', [...adminUsers, newName], newName, 'added');
+                    }
+                    document.getElementById('new-admin-input').value = '';
+                });
+
+                document.getElementById('user-list')?.addEventListener('click', e => {
+                    if (e.target.classList.contains('remove-user-btn')) {
+                        const nameToRemove = e.target.dataset.name;
+                        updateConfigList('users', userNames.filter(name => name !== nameToRemove), nameToRemove, 'removed');
+                    }
+                });
+                document.getElementById('client-list')?.addEventListener('click', e => {
+                    if (e.target.classList.contains('remove-client-btn')) {
+                        const nameToRemove = e.target.dataset.name;
+                        updateConfigList('clients', clients.filter(name => name !== nameToRemove), nameToRemove, 'removed');
+                    }
+                });
+                document.getElementById('admin-list')?.addEventListener('click', e => {
+                    if (e.target.classList.contains('remove-admin-btn')) {
+                        const nameToRemove = e.target.dataset.name;
+                        updateConfigList('admins', adminUsers.filter(name => name !== nameToRemove), nameToRemove, 'removed');
+                    }
+                });
+
+                document.getElementById('save-time-settings-btn')?.addEventListener('click', saveTimeSettings);
+                document.getElementById('delete-month-data-btn')?.addEventListener('click', handleDeleteMonthData);
+            }
+            
+            function createUserDataTables() {
+                const today = getTodayIST();
+                const datesForMonth = getDatesForMonth(currentDate);
+                userNames.forEach(userName => {
+                    const userId = createIdFromName(userName);
+                    const container = document.getElementById(userId);
+                    if (!container) return;
+                    const monthYear = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                    let tableHTML = `
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h2 class="text-2xl font-semibold text-gray-800">${userName}'s Data Entry</h2>
+                             <div class="flex items-center gap-2">
+                                <button class="btn quick-entry-btn" data-user="${userName}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" /></svg>
+                                    Quick Entry
+                                </button>
+                                <button class="nav-btn prev-month">&lt; Prev</button>
+                                <span class="font-semibold text-lg">${monthYear}</span>
+                                <button class="nav-btn next-month">Next &gt;</button>
+                            </div>
+                        </div>
+                        <div class="table-container">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="sticky-col px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client Name</th>`;
+                    datesForMonth.forEach(date => {
+                        tableHTML += `<th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider ${date === today ? 'highlight-today' : ''}">${new Date(date + 'T00:00:00').toLocaleDateString()}<br>(Files / Errors)</th>`;
+                    });
+                    tableHTML += `
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">`;
+                    clients.forEach(client => {
+                        const clientId = createIdFromName(client);
+                        tableHTML += `<tr><td class="sticky-col px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${client}</td>`;
+                        datesForMonth.forEach(date => {
+                            const fileValue = masterData[userId]?.[clientId]?.[date]?.files || 0;
+                            const errorValue = masterData[userId]?.[clientId]?.[date]?.errors || 0;
+                            tableHTML += `
+                                <td class="px-6 py-4 ${date === today ? 'highlight-today' : ''}">
+                                    <div class="input-group">
+                                        <input type="number" min="0" class="data-input performance-data-input" value="${fileValue}" data-user="${userName}" data-client="${client}" data-date="${date}" data-type="files" style="width: 65px;">
+                                        <input type="number" min="0" class="data-input performance-data-input" value="${errorValue}" data-user="${userName}" data-client="${client}" data-date="${date}" data-type="errors" style="width: 65px;">
+                                        <div class="saving-indicator">
+                                            <svg class="animate-spin h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </td>`;
+                        });
+                        tableHTML += `</tr>`;
+                    });
+                    tableHTML += `
+                                </tbody>
+                                <tfoot class="bg-gray-100 font-bold">
+                                    <tr class="border-t-2 border-gray-300">
+                                        <td class="sticky-col px-6 py-4">Daily Totals</td>`;
+                    datesForMonth.forEach(date => {
+                        let dailyFiles = 0;
+                        let dailyErrors = 0;
+                        clients.forEach(client => {
+                            const clientId = createIdFromName(client);
+                            dailyFiles += masterData[userId]?.[clientId]?.[date]?.files || 0;
+                            dailyErrors += masterData[userId]?.[clientId]?.[date]?.errors || 0;
+                        });
+                        tableHTML += `<td class="px-6 py-4 text-center ${date === today ? 'highlight-today' : ''}">${dailyFiles} / ${dailyErrors}</td>`;
+                    });
+                    tableHTML += `
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>`;
+                    container.innerHTML = tableHTML;
+                });
+            }
+
+            document.getElementById('tabs').addEventListener('click', (e) => { if (e.target.closest('.tab-btn')) { document.getElementById('tabs').querySelectorAll('.tab-btn').forEach(tab => tab.classList.remove('active')); document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.add('hidden')); e.target.closest('.tab-btn').classList.add('active'); document.getElementById(e.target.closest('.tab-btn').dataset.target).classList.remove('hidden'); } });
+            document.getElementById('tab-content').addEventListener('click', (e) => { 
+                if (e.target.classList.contains('prev-month')) { currentDate.setMonth(currentDate.getMonth() - 1); fetchAndRenderMonthData(); } 
+                if (e.target.classList.contains('next-month')) { currentDate.setMonth(currentDate.getMonth() + 1); fetchAndRenderMonthData(); }
+                if (e.target.classList.contains('quick-entry-btn')) { openQuickEntryModal(e.target.dataset.user); }
+            });
+            
+            function generateSummaryTableHTML(data, goal = null) {
+                let tableHTML = `<thead class="bg-gray-100"><tr><th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th><th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">File Count</th><th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Error Count</th><th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Error Rate</th></tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+                if (!data || !data.userData || data.userData.length === 0) {
+                    tableHTML += '<tr><td colspan="4" class="text-center py-10 text-gray-500">No data available for this period.</td></tr>';
+                } else {
+                    const maxFiles = Math.max(...data.userData.map(item => item.files));
+                    const maxErrorRate = Math.max(...data.userData.map(item => item.files > 0 ? (item.errors / item.files) * 100 : 0));
+                    data.userData.forEach(item => {
+                        const errorRate = item.files > 0 ? (item.errors / item.files) * 100 : 0;
+                        const fileHighlight = item.files > 0 && item.files === maxFiles ? 'highlight-max-files' : '';
+                        const errorHighlight = errorRate > 0 && errorRate === maxErrorRate ? 'highlight-max-errors' : '';
+                        let progressHTML = '';
+                        if (goal !== null && goal > 0) {
+                            const progress = (item.files / goal) * 100;
+                            progressHTML = `<div class="text-xs text-gray-500 mt-1">${item.files.toLocaleString()} / ${goal.toLocaleString()}</div><div class="progress-bar-container"><div class="progress-bar" style="width: ${progress > 100 ? 100 : progress}%"></div></div>`;
+                        }
+                        tableHTML += `<tr class="${fileHighlight} ${errorHighlight}"><td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900"><div>${item.name}</div>${progressHTML}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${item.files.toLocaleString()}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${item.errors.toLocaleString()}</td><td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${errorRate > 5 ? 'text-red-600' : 'text-green-600'}">${errorRate.toFixed(2)}%</td></tr>`;
+                    });
+                }
+                tableHTML += `</tbody><tfoot class="bg-gray-100 font-bold"><tr><td class="px-6 py-4 text-gray-800">Overall Totals</td><td class="px-6 py-4 text-gray-800">${(data && data.totals) ? data.totals.files.toLocaleString() : 0}</td><td class="px-6 py-4 text-gray-800">${(data && data.totals) ? data.totals.errors.toLocaleString() : 0}</td><td class="px-6 py-4 text-gray-800">${(data && data.totals) ? data.totals.errorRate.toFixed(2) : 0}%</td></tr></tfoot>`;
+                return tableHTML;
+            }
+
+            function calculateTimeSpent(periodDates) {
+                let totalMinutes = 0;
+                userNames.forEach(userName => {
+                    const userId = createIdFromName(userName);
+                    clients.forEach(client => {
+                        const clientId = createIdFromName(client);
+                        periodDates.forEach(date => {
+                            const files = masterData[userId]?.[clientId]?.[date]?.files || 0;
+                            if (files > 0) {
+                                const timePerFile = timeConfig.clients[client] || timeConfig.average;
+                                totalMinutes += files * timePerFile;
+                            }
+                        });
+                    });
+                });
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = Math.round(totalMinutes % 60);
+                return `${hours}h ${minutes}m`;
+            }
+
+            function calculateSummaryForPeriod(periodDates) { let overallFilesTotal = 0; let overallErrorsTotal = 0; const userData = []; userNames.forEach(userName => { const userId = createIdFromName(userName); let userFilesTotal = 0; let userErrorsTotal = 0; clients.forEach(client => { const clientId = createIdFromName(client); periodDates.forEach(date => { if (masterData[userId]?.[clientId]?.[date]) { userFilesTotal += masterData[userId][clientId][date].files || 0; userErrorsTotal += masterData[userId][clientId][date].errors || 0; } }); }); userData.push({ name: userName, files: userFilesTotal, errors: userErrorsTotal }); overallFilesTotal += userFilesTotal; overallErrorsTotal += userErrorsTotal; }); const overallErrorRate = overallFilesTotal > 0 ? (overallErrorsTotal / overallFilesTotal) * 100 : 0; return { userData, totals: { files: overallFilesTotal, errors: overallErrorsTotal, errorRate: overallErrorRate } }; }
+            function renderChart(canvasId, chartType, summaryData) { const ctx = document.getElementById(canvasId).getContext('2d'); if (charts[chartType]) { charts[chartType].destroy(); } charts[chartType] = new Chart(ctx, { type: 'bar', data: { labels: summaryData.userData.map(u => u.name), datasets: [{ label: 'Total Files', data: summaryData.userData.map(u => u.files), backgroundColor: 'rgba(79, 70, 229, 0.8)', borderColor: 'rgba(79, 70, 229, 1)', borderWidth: 1 }, { label: 'Total Errors', data: summaryData.userData.map(u => u.errors), backgroundColor: 'rgba(239, 68, 68, 0.8)', borderColor: 'rgba(239, 68, 68, 1)', borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { tooltip: { callbacks: { label: function(context) { const label = context.dataset.label || ''; const value = context.raw; const userIndex = context.dataIndex; const otherDatasetIndex = context.datasetIndex === 0 ? 1 : 0; const otherValue = context.chart.data.datasets[otherDatasetIndex].data[userIndex]; const files = context.datasetIndex === 0 ? value : otherValue; const errors = context.datasetIndex === 0 ? otherValue : value; const errorRate = files > 0 ? ((errors / files) * 100).toFixed(2) : 0; let tooltipText = [`${label}: ${value}`]; if (context.datasetIndex === 0) { tooltipText.push(`Errors: ${errors}`); } else { tooltipText.push(`Files: ${files}`); } tooltipText.push(`Error Rate: ${errorRate}%`); return tooltipText; } } } } } }); }
+            function updateAllSummaries() { updateDailySummary(); updateWeeklySummary(); updateMonthlySummary(); }
+            
+            function updateDailySummary() { 
+                const searchDateStr = document.getElementById('date-search').value; 
+                if (!searchDateStr) return; 
+                const dailyData = calculateSummaryForPeriod([searchDateStr]); 
+                document.getElementById('daily-summary-table').innerHTML = generateSummaryTableHTML(dailyData); 
+                renderChart('daily-chart', 'daily', dailyData); 
+                document.getElementById('daily-total-time').textContent = calculateTimeSpent([searchDateStr]);
+            }
+            
+            function getDatesOfWeek(weekString) { if (!weekString) return []; const [year, weekNumber] = weekString.split('-W').map(Number); const firstDayOfYear = new Date(Date.UTC(year, 0, 1)); const firstDayOfWeekOfYear = firstDayOfYear.getUTCDay() || 7; let firstMonday = new Date(firstDayOfYear); if (firstDayOfWeekOfYear > 4) { firstMonday.setUTCDate(firstDayOfYear.getUTCDate() + 8 - firstDayOfWeekOfYear); } else { firstMonday.setUTCDate(firstDayOfYear.getUTCDate() + 1 - firstDayOfWeekOfYear); } const startDate = new Date(firstMonday); startDate.setUTCDate(firstMonday.getUTCDate() + (weekNumber - 1) * 7); const weekDates = []; for (let i = 0; i < 7; i++) { const d = new Date(startDate); d.setUTCDate(startDate.getUTCDate() + i); weekDates.push(d.toISOString().split('T')[0]); } return weekDates; }
+            
+            function updateWeeklySummary() { 
+                const weekString = document.getElementById('week-search').value; 
+                if (!weekString) return; 
+                const weekDates = getDatesOfWeek(weekString); 
+                const weeklyData = calculateSummaryForPeriod(weekDates); 
+                document.getElementById('weekly-summary-table').innerHTML = generateSummaryTableHTML(weeklyData, weeklyGoal); 
+                renderChart('weekly-chart', 'weekly', weeklyData); 
+                document.getElementById('weekly-total-time').textContent = calculateTimeSpent(weekDates);
+            }
+
+            function updateMonthlySummary() { 
+                const monthString = document.getElementById('month-search').value; 
+                if (!monthString) return; 
+                const monthDates = getDatesForMonth(new Date(monthString + '-02T00:00:00')); 
+                const monthlyData = calculateSummaryForPeriod(monthDates); 
+                document.getElementById('monthly-summary-table').innerHTML = generateSummaryTableHTML(monthlyData, monthlyGoal); 
+                renderChart('monthly-chart', 'monthly', monthlyData); 
+                document.getElementById('monthly-total-time').textContent = calculateTimeSpent(monthDates);
+            }
+
+            function exportToCSV(summaryData, filename) { let csvContent = "data:text/csv;charset=utf-8,"; csvContent += "Name,File Count,Error Count,Error Rate\r\n"; summaryData.userData.forEach(item => { const errorRate = item.files > 0 ? (item.errors / item.files) * 100 : 0; csvContent += `${item.name},${item.files},${item.errors},${errorRate.toFixed(2)}%\r\n`; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", filename); document.body.appendChild(link); link.click(); document.body.removeChild(link); }
+            
+            function updateUserTableTotals(userName) {
+                const userId = createIdFromName(userName);
+                const table = document.querySelector(`#${userId} table`);
+                if (!table) return;
+
+                const datesForMonth = getDatesForMonth(currentDate);
+                const footerRow = table.querySelector('tfoot tr');
+                if (!footerRow) return;
+
+                datesForMonth.forEach((date, index) => {
+                    let dailyFiles = 0;
+                    let dailyErrors = 0;
+                    clients.forEach(client => {
+                        const clientId = createIdFromName(client);
+                        dailyFiles += masterData[userId]?.[clientId]?.[date]?.files || 0;
+                        dailyErrors += masterData[userId]?.[clientId]?.[date]?.errors || 0;
+                    });
+                    const cell = footerRow.cells[index + 1]; 
+                    if (cell) {
+                        cell.textContent = `${dailyFiles} / ${dailyErrors}`;
+                    }
+                });
+            }
+            
+            // --- Event listeners for main table inputs ---
+            document.getElementById('tab-content').addEventListener('input', (e) => { 
+                if (e.target.classList.contains('performance-data-input')) { 
+                    const indicator = e.target.parentElement.querySelector('.saving-indicator');
+                    indicator.classList.add('saving');
+
+                    const { user, client, date, type } = e.target.dataset; 
+                    const value = parseInt(e.target.value, 10) || 0; 
+                    const userId = createIdFromName(user); 
+                    const clientId = createIdFromName(client); 
+                    const oldValue = masterData[userId]?.[clientId]?.[date]?.[type] || 0; 
+                    
+                    if (!masterData[userId]) masterData[userId] = {}; 
+                    if (!masterData[userId][clientId]) masterData[userId][clientId] = {}; 
+                    if (!masterData[userId][clientId][date]) masterData[userId][clientId][date] = { files: 0, errors: 0 }; 
+                    
+                    masterData[userId][clientId][date][type] = value; 
+                    
+                    updateUserTableTotals(user);
+                    updateAllSummaries(); 
+                    
+                    const inputId = `${user}-${client}-${date}-${type}`; 
+                    if (debounceTimers[inputId]) { clearTimeout(debounceTimers[inputId]); } 
+                    debounceTimers[inputId] = setTimeout(() => { updateFirestoreData(user, client, date, type, value, oldValue, e.target); delete debounceTimers[inputId]; }, 1200); 
+                } 
+            });
+
+            // --- Global input focus handlers (for main table and modal) ---
+            document.body.addEventListener('focusin', (e) => { 
+                if (e.target.classList.contains('data-input')) { 
+                    if (e.target.value === '0') {
+                        e.target.value = ''; 
+                    }
+                } 
+            });
+            document.body.addEventListener('focusout', (e) => { 
+                if (e.target.classList.contains('data-input')) { 
+                    if (e.target.value === '') {
+                        e.target.value = '0'; 
+                    }
+                } 
+            });
+
+            function initializePickers() { const dateSearchInput = document.getElementById('date-search'); const weekSearchInput = document.getElementById('week-search'); const monthSearchInput = document.getElementById('month-search'); dateSearchInput.addEventListener('change', updateAllSummaries); weekSearchInput.addEventListener('change', updateAllSummaries); monthSearchInput.addEventListener('change', updateAllSummaries); document.getElementById('export-daily').addEventListener('click', () => { const data = calculateSummaryForPeriod([dateSearchInput.value]); exportToCSV(data, `daily_summary_${dateSearchInput.value}.csv`); }); document.getElementById('export-weekly').addEventListener('click', () => { const weekDates = getDatesOfWeek(weekSearchInput.value); const data = calculateSummaryForPeriod(weekDates); exportToCSV(data, `weekly_summary_${weekSearchInput.value}.csv`); }); document.getElementById('export-monthly').addEventListener('click', () => { const monthDates = getDatesForMonth(new Date(monthSearchInput.value + '-02T00:00:00')); const data = calculateSummaryForPeriod(monthDates); exportToCSV(data, `monthly_summary_${monthSearchInput.value}.csv`); }); const defaultDate = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })); dateSearchInput.value = defaultDate.toISOString().split('T')[0]; const year = defaultDate.getFullYear(); const month = defaultDate.getMonth(); const firstDayOfYear = new Date(year, 0, 1); const pastDaysOfYear = (defaultDate - firstDayOfYear) / 86400000; const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7); weekSearchInput.value = `${year}-W${String(weekNumber).padStart(2, '0')}`; monthSearchInput.value = `${year}-${String(month + 1).padStart(2, '0')}`; }
+            
+            // --- Quick Entry Modal Logic ---
+            function populateModalForm(userName, date) {
+                const userId = createIdFromName(userName);
+                const formContainer = document.getElementById('quick-entry-form-container');
+                formContainer.innerHTML = ''; // Clear previous content
+
+                document.getElementById('modal-subtitle').textContent = `Editing data for: ${new Date(date + 'T00:00:00').toLocaleDateString()}`;
+
+                clients.forEach(client => {
+                    const clientId = createIdFromName(client);
+                    const fileValue = masterData[userId]?.[clientId]?.[date]?.files || 0;
+                    const errorValue = masterData[userId]?.[clientId]?.[date]?.errors || 0;
+
+                    const clientRow = document.createElement('div');
+                    clientRow.className = 'grid grid-cols-3 gap-4 items-center client-row p-2 rounded-md hover:bg-gray-50';
+                    clientRow.dataset.clientName = client.toLowerCase();
+                    clientRow.innerHTML = `
+                        <label class="text-gray-700 font-medium truncate" title="${client}">${client}</label>
+                        <input type="number" min="0" value="${fileValue}" data-type="files" data-client="${client}" class="data-input !w-full modal-input" placeholder="Files">
+                        <input type="number" min="0" value="${errorValue}" data-type="errors" data-client="${client}" class="data-input !w-full modal-input" placeholder="Errors">
+                    `;
+                    formContainer.appendChild(clientRow);
+                });
+                 clientSearchInput.dispatchEvent(new Event('input'));
+            }
+
+            function openQuickEntryModal(userName) {
+                const today = getTodayIST();
+                modalDatePicker.value = today;
+                
+                quickEntryModal.dataset.user = userName;
+                populateModalForm(userName, today);
+                
+                clientSearchInput.value = ''; 
+                quickEntryModal.classList.add('show');
+            }
+
+            modalDatePicker.addEventListener('change', () => {
+                const userName = quickEntryModal.dataset.user;
+                const selectedDate = modalDatePicker.value;
+                if(userName && selectedDate) {
+                    populateModalForm(userName, selectedDate);
+                }
+            });
+
+            function closeQuickEntryModal() {
+                quickEntryModal.classList.remove('show');
+            }
+
+            async function saveQuickEntryData() {
+                const userName = quickEntryModal.dataset.user;
+                const date = modalDatePicker.value;
+                if (!userName || !date) {
+                    showNotification("Could not save. User or date is missing.", "error");
+                    return;
+                }
+
+                const userId = createIdFromName(userName);
+                const inputs = document.querySelectorAll('#quick-entry-form-container .modal-input');
+                
+                const batch = writeBatch(db);
+                const monthId = date.substring(0, 7);
+                const docId = `${userId}-${monthId}`;
+                const docRef = doc(db, "monthlyReports", docId);
+                const author = currentUser.displayName;
+                let changesMade = 0;
+
+                const dataToSave = {};
+                const localDataToUpdate = {};
+
+                inputs.forEach(input => {
+                    const client = input.dataset.client;
+                    const clientId = createIdFromName(client);
+                    const type = input.dataset.type;
+                    const value = parseInt(input.value, 10) || 0;
+                    const oldValue = masterData[userId]?.[clientId]?.[date]?.[type] || 0;
+
+                    if (value !== oldValue) {
+                        if (!dataToSave[clientId]) dataToSave[clientId] = {};
+                        if (!dataToSave[clientId][date]) dataToSave[clientId][date] = {};
+                        dataToSave[clientId][date][type] = value;
+                        
+                        // Prepare local data update
+                        if (!localDataToUpdate[clientId]) localDataToUpdate[clientId] = {};
+                        if (!localDataToUpdate[clientId][date]) localDataToUpdate[clientId][date] = { files: oldValue.files, errors: oldValue.errors };
+                         localDataToUpdate[clientId][date][type] = value;
+
+                         const logRef = doc(collection(db, "auditLog"));
+                         batch.set(logRef, {
+                            user: author,
+                            action: `Updated ${type} for ${client} on ${date} from ${oldValue} to ${value} via Quick Entry.`,
+                            timestamp: serverTimestamp()
+                        });
+                        changesMade++;
+                    }
+                });
+
+                if (changesMade > 0) {
+                     batch.set(docRef, { userId, userName, month: monthId, data: dataToSave }, { merge: true });
+
+                    await batch.commit();
+                    
+                    // --- IMPORTANT: Update local masterData and re-render ---
+                    Object.keys(localDataToUpdate).forEach(clientId => {
+                        Object.keys(localDataToUpdate[clientId]).forEach(dateKey => {
+                            if (!masterData[userId]) masterData[userId] = {};
+                            if (!masterData[userId][clientId]) masterData[userId][clientId] = {};
+                            if (!masterData[userId][clientId][dateKey]) masterData[userId][clientId][dateKey] = {};
+                            masterData[userId][clientId][dateKey].files = localDataToUpdate[clientId][dateKey].files;
+                            masterData[userId][clientId][dateKey].errors = localDataToUpdate[clientId][dateKey].errors;
+                        });
+                    });
+                    
+                    createUserDataTables();
+                    updateAllSummaries();
+                    // --- End of update logic ---
+
+                    showNotification(`${changesMade} value(s) saved successfully!`, 'success');
+                } else {
+                    showNotification('No changes were made.', 'success');
+                }
+
+                closeQuickEntryModal();
+            }
+
+            clientSearchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                const clientRows = document.querySelectorAll('.client-row');
+                clientRows.forEach(row => {
+                    const clientName = row.dataset.clientName;
+                    if (clientName.includes(searchTerm)) {
+                        row.style.display = 'grid';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+
+            closeModalBtn.addEventListener('click', closeQuickEntryModal);
+            saveAllModalBtn.addEventListener('click', saveQuickEntryData);
+
+            // --- Confirmation Modal Logic ---
+            function openConfirmationModal(title, message, onConfirm) {
+                document.getElementById('confirmation-title').textContent = title;
+                document.getElementById('confirmation-message').textContent = message;
+                
+                const confirmBtn = document.getElementById('confirm-action-btn');
+                const cancelBtn = document.getElementById('cancel-confirmation-btn');
+
+                // Clone and replace the confirm button to remove old event listeners
+                const newConfirmBtn = confirmBtn.cloneNode(true);
+                confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+                newConfirmBtn.addEventListener('click', () => {
+                    onConfirm();
+                    closeConfirmationModal();
+                });
+
+                cancelBtn.onclick = closeConfirmationModal;
+                confirmationModal.classList.add('show');
+            }
+
+            function closeConfirmationModal() {
+                confirmationModal.classList.remove('show');
+            }
+
+            // --- Admin Panel Actions ---
+            async function saveTimeSettings() {
+                const newAvg = parseFloat(document.getElementById('avg-time-input').value) || 2;
+                const newClientTimes = {};
+                document.querySelectorAll('.time-input').forEach(input => {
+                    if (input.value) {
+                        newClientTimes[input.dataset.client] = parseFloat(input.value);
+                    }
+                });
+
+                const newTimeConfig = { average: newAvg, clients: newClientTimes };
+
+                try {
+                    await setDoc(doc(db, "config", "time"), newTimeConfig);
+                    timeConfig = newTimeConfig;
+                    showNotification("Time settings saved successfully!", "success");
+                    updateAnalyticsView();
+                } catch (error) {
+                    console.error("Error saving time settings:", error);
+                    showNotification("Error saving time settings.", "error");
+                }
+            }
+
+            function handleDeleteMonthData() {
+                const monthName = currentDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+                openConfirmationModal(
+                    "Delete All Data for " + monthName + "?",
+                    "This is irreversible. All user entries for the current month will be permanently deleted.",
+                    async () => {
+                        const monthId = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+                        const q = query(collection(db, "monthlyReports"), where("month", "==", monthId));
+                        
+                        try {
+                            const snapshot = await getDocs(q);
+                            const batch = writeBatch(db);
+                            snapshot.forEach(doc => {
+                                batch.delete(doc.ref);
+                            });
+
+                            const logRef = doc(collection(db, "auditLog"));
+                            batch.set(logRef, {
+                                user: currentUser.displayName,
+                                action: `Deleted all data for month ${monthId}.`,
+                                timestamp: serverTimestamp()
+                            });
+
+                            await batch.commit();
+                            
+                            masterData = {}; // Clear local data
+                            createUserDataTables();
+                            updateAllSummaries();
+                            updateAnalyticsView();
+                            showNotification(`All data for ${monthName} has been deleted.`, "success");
+
+                        } catch (error) {
+                            console.error("Error deleting month data:", error);
+                            showNotification("Failed to delete month data.", "error");
+                        }
+                    }
+                );
+            }
+
+            // --- Analytics Tab Logic ---
+            function getAnalyticsPaneHTML() {
+                const userOptions = userNames.map(name => `<option value="${name}">${name}</option>`).join('');
+                const adminOptions = `<option value="Whole Team">Whole Team</option>${userOptions}`;
+
+                return `
+                    <div class="summary-section analytics-pane-section !mt-6">
+                        <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                             <h2 class="text-2xl font-semibold text-gray-800">Analytics Dashboard</h2>
+                             <div class="flex items-center gap-4">
+                                ${isUserAdmin() ? `
+                                <select id="analytics-user-select" class="p-2 border border-gray-300 rounded-md">
+                                    ${adminOptions}
+                                </select>` : ''}
+                                <select id="analytics-period-select" class="p-2 border border-gray-300 rounded-md">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="daily">Daily</option>
+                                </select>
+                                <button id="export-analytics-csv" class="btn">Export to CSV</button>
+                             </div>
+                        </div>
+
+                        <div id="analytics-content" class="space-y-8">
+                            <!-- Stats cards -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <h4 class="text-sm font-medium text-gray-500">Total Files</h4>
+                                    <p id="analytics-total-files" class="text-3xl font-bold text-indigo-600">0</p>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <h4 class="text-sm font-medium text-gray-500">Total Errors</h4>
+                                    <p id="analytics-total-errors" class="text-3xl font-bold text-red-600">0</p>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <h4 class="text-sm font-medium text-gray-500">Error Rate</h4>
+                                    <p id="analytics-error-rate" class="text-3xl font-bold text-gray-800">0.00%</p>
+                                </div>
+                                <div class="bg-white p-4 rounded-lg shadow">
+                                    <h4 class="text-sm font-medium text-gray-500">Total Time Spent</h4>
+                                    <p id="analytics-total-time" class="text-3xl font-bold text-gray-800">0h 0m</p>
+                                    <p id="analytics-total-minutes" class="text-xs text-gray-500">(0 minutes)</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Charts -->
+                            <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                                <div class="lg:col-span-2 bg-white p-4 rounded-lg border">
+                                    <h4 class="font-semibold mb-2">Files by Client</h4>
+                                    <div class="chart-container" style="height: 350px;"><canvas id="analytics-pie-chart"></canvas></div>
+                                </div>
+                                <div class="lg:col-span-3 bg-white p-4 rounded-lg border">
+                                    <h4 class="font-semibold mb-2">Daily Performance</h4>
+                                    <div class="chart-container" style="height: 350px;"><canvas id="analytics-line-chart"></canvas></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function calculateAnalyticsData(selectedUser, period) {
+                let datesForPeriod;
+                const today = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+                
+                if (period === 'daily') {
+                    datesForPeriod = [today.toISOString().split('T')[0]];
+                } else if (period === 'weekly') {
+                    const weekString = `${today.getFullYear()}-W${String(Math.ceil((((today - new Date(today.getFullYear(), 0, 1)) / 86400000) + new Date(today.getFullYear(), 0, 1).getDay() + 1) / 7)).padStart(2, '0')}`;
+                    datesForPeriod = getDatesOfWeek(weekString);
+                } else { // monthly
+                    datesForPeriod = getDatesForMonth(today);
+                }
+
+                const usersToProcess = selectedUser === 'Whole Team' ? userNames : [selectedUser];
+                let totalFiles = 0, totalErrors = 0, totalMinutes = 0;
+                const clientFiles = {};
+                const dailyFiles = {};
+
+                const allDatesInMonth = getDatesForMonth(currentDate);
+                allDatesInMonth.forEach(date => { dailyFiles[date] = 0; });
+
+                usersToProcess.forEach(userName => {
+                    const userId = createIdFromName(userName);
+                    const userData = masterData[userId] || {};
+                    clients.forEach(client => {
+                        const clientId = createIdFromName(client);
+                        if (!clientFiles[client]) clientFiles[client] = 0;
+
+                        if (userData[clientId]) {
+                            datesForPeriod.forEach(date => {
+                                const dayData = userData[clientId][date];
+                                if (dayData) {
+                                    const files = dayData.files || 0;
+                                    totalFiles += files;
+                                    totalErrors += dayData.errors || 0;
+                                    clientFiles[client] += files;
+                                    if(dailyFiles[date] !== undefined) dailyFiles[date] += files;
+                                    const timePerFile = timeConfig.clients[client] || timeConfig.average;
+                                    totalMinutes += files * timePerFile;
+                                }
+                            });
+                        }
+                    });
+                });
+                
+                return { totalFiles, totalErrors, totalMinutes, clientFiles, dailyFiles, datesForPeriod };
+            }
+
+            function updateAnalyticsView() {
+                const userSelect = document.getElementById('analytics-user-select');
+                const periodSelect = document.getElementById('analytics-period-select');
+                if (!periodSelect) return;
+
+                const selectedUser = isUserAdmin() ? userSelect.value : currentUser.displayName;
+                const selectedPeriod = periodSelect.value;
+                
+                const data = calculateAnalyticsData(selectedUser, selectedPeriod);
+
+                document.getElementById('analytics-total-files').textContent = data.totalFiles.toLocaleString();
+                document.getElementById('analytics-total-errors').textContent = data.totalErrors.toLocaleString();
+                const errorRate = data.totalFiles > 0 ? (data.totalErrors / data.totalFiles) * 100 : 0;
+                document.getElementById('analytics-error-rate').textContent = `${errorRate.toFixed(2)}%`;
+                
+                const hours = Math.floor(data.totalMinutes / 60);
+                const minutes = Math.round(data.totalMinutes % 60);
+                document.getElementById('analytics-total-time').textContent = `${hours}h ${minutes}m`;
+                document.getElementById('analytics-total-minutes').textContent = `(${Math.round(data.totalMinutes).toLocaleString()} minutes)`;
+
+                const pieCtx = document.getElementById('analytics-pie-chart').getContext('2d');
+                if (charts.analyticsPie) charts.analyticsPie.destroy();
+                charts.analyticsPie = new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: Object.keys(data.clientFiles),
+                        datasets: [{ data: Object.values(data.clientFiles), backgroundColor: ['#4f46e5', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444'] }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+
+                const lineCtx = document.getElementById('analytics-line-chart').getContext('2d');
+                if (charts.analyticsLine) charts.analyticsLine.destroy();
+                charts.analyticsLine = new Chart(lineCtx, {
+                    type: 'line',
+                    data: {
+                        labels: data.datesForPeriod.map(d => new Date(d + 'T00:00:00').getDate()),
+                        datasets: [{
+                            label: 'Files Processed',
+                            data: data.datesForPeriod.map(d => data.dailyFiles[d] || 0),
+                            borderColor: '#4f46e5',
+                            tension: 0.1,
+                            fill: false
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+                });
+            }
+
+            function exportAnalyticsToCSV() {
+                const userSelect = document.getElementById('analytics-user-select');
+                const periodSelect = document.getElementById('analytics-period-select');
+                const selectedUser = isUserAdmin() ? userSelect.value : currentUser.displayName;
+                const selectedPeriod = periodSelect.value;
+                
+                const data = calculateAnalyticsData(selectedUser, selectedPeriod);
+                
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += `Analytics Report for ${selectedUser} - ${selectedPeriod}\r\n`;
+                csvContent += "Metric,Value\r\n";
+                csvContent += `Total Files,${data.totalFiles}\r\n`;
+                csvContent += `Total Errors,${data.totalErrors}\r\n`;
+                csvContent += `Error Rate,${(data.totalFiles > 0 ? (data.totalErrors / data.totalFiles) * 100 : 0).toFixed(2)}%\r\n`;
+                csvContent += `Total Time (Minutes),${Math.round(data.totalMinutes)}\r\n\r\n`;
+                
+                csvContent += "Files by Client\r\n";
+                csvContent += "Client,File Count\r\n";
+                Object.entries(data.clientFiles).forEach(([client, files]) => {
+                    csvContent += `"${client}",${files}\r\n`;
+                });
+                csvContent += "\r\n";
+
+                csvContent += "Daily Performance\r\n";
+                csvContent += "Date,File Count\r\n";
+                data.datesForPeriod.forEach(date => {
+                    const d = new Date(date + 'T00:00:00');
+                    const formattedDate = `="${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}"`;
+                    csvContent += `${formattedDate},${data.dailyFiles[date] || 0}\r\n`;
+                });
+
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `analytics_${selectedUser.replace(' ', '_')}_${selectedPeriod}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            const backToTopButton = document.getElementById('back-to-top');
+            window.onscroll = () => {
+                if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+                    backToTopButton.classList.add('show');
+                } else {
+                    backToTopButton.classList.remove('show');
+                }
+            };
+            backToTopButton.onclick = () => { window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        });
+    </script>
+
+</body>
+</html>
