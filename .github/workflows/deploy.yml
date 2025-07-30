@@ -23,9 +23,10 @@ jobs:
       - name: Deploy to Firebase
         uses: w9jds/firebase-action@master
         with:
-          action: deploy
-          project_id: 'team-nethra'
-          token: ${{ secrets.FIREBASE_TOKEN }}
-          args: --only functions
+          # We pass all commands in the 'args' input now
+          args: deploy --only functions --project team-nethra
         env:
+          # The Firebase token is now passed as an environment variable
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          # The Brevo key is also passed as an environment variable
           BREVO_KEY: ${{ secrets.BREVO_KEY }}
