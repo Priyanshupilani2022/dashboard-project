@@ -18,7 +18,8 @@ jobs:
           node-version: '20'
 
       - name: Install Functions Dependencies
-        run: npm --prefix functions install
+        # Use 'npm ci' for a clean, reliable install in CI environments
+        run: npm --prefix functions ci
 
       - name: Deploy to Firebase
         uses: w9jds/firebase-action@master
